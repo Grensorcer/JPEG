@@ -3,26 +3,28 @@ from PIL import Image as pili
 import numpy as np
 
 
+class MacroBlock:
+    def __init__(self, block):
+        self._block = block
+
+
+
 class MyImage:
-    def __init__(self, height=1, width=1, array=None, space='RGB'):
-        self._repr = array.copy() if array is not None else np.full(255, shape=(height, width, 3))
+    def __init__(self, height=1, width=1, array=None, space='RGB', grayscale=False):
+        self._repr = array.copy() if array is not None else np.full((height, width, 3), 255, dtype='uint8')
         self._space = space
+        self._grayscale = grayscale
 
     def to_image(self) -> pili.Image:
         return pili.fromarray(self._repr)
-
-    def save(self, path):
-        pili.fromarray(self._repr).save(path)
 
     def __copy__(self):
         return MyImage(array=self._repr)
 
     @staticmethod
     def grayscale(img):
-        get_grey = lambda r,g,b: int(r * 0.2989 + g * 0.5870 + b * 0.1140)
-        grayscaling = lambda x : np.array([get_grey(x[0], x[1], x[2]), get_grey(x[0], x[1], x[2]), get_grey(x[0], x[1], x[2])], dtype='uint8')
-        res = np.apply_along_axis(grayscaling, 2, img.array)
-        return MyImage(array=res)
+        res = img.array[..., :3] @ [0.2989, 0.5870, 0.1140]
+        return MyImage(array=res, grayscale=True)
 
     @staticmethod
     def from_image(path):
@@ -32,6 +34,17 @@ class MyImage:
         image = pili.open(p).convert("RGB")
         return MyImage(array=np.asarray(image))
 
+    @staticmethod
+    def get_macro_blocks(img):
+        split_height = img.array.shape[0] / 8
+        split_width = img.array.shape[1] / 8
+        return np.array([np.split(x, split_width, axis=1) for x in np.split(img.array, split_height)])
+
+    @staticmethod
+    def from_macro_blocks(macro_blocks):
+        return MyImage(array=np.concatenate(np.concatenate(macro_blocks, axis=1), axis=1))
+
+
     @property
     def array(self):
         return self._repr
@@ -39,6 +52,14 @@ class MyImage:
     @property
     def shape(self):
         return self._repr.shape
+
+    @property
+    def height(self):
+        return self._repr.shape[0]
+
+    @property
+    def width(self):
+        return self._repr.shape[1]
 
     @property
     def space(self):
