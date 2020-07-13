@@ -37,10 +37,10 @@ class MyImage:
     @staticmethod
     def get_macro_blocks(img):
         arr = img.array
-        if img.height % 8 != 0:
-            arr = np.concatenate((arr, np.zeros(shape=(8 - img.height % 8, img.width, 3), dtype='uint8')), axis=0)
-        if img.width % 8 != 0:
-            arr = np.concatenate((arr, np.zeros(shape=(arr.shape[0], 8 - img.width % 8, 3), dtype='uint8')), axis=1)
+
+        height_pad = 8 - img.height % 8 if img.height % 8 != 0 else 0
+        width_pad = 8 - img.width % 8 if img.width % 8 != 0 else 0
+        arr = np.pad(arr, [(0, height_pad), (0, width_pad), (0,0)], mode='symmetric')
 
         split_height = arr.shape[0] / 8
         split_width = arr.shape[1] / 8
