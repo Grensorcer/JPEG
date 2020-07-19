@@ -1,12 +1,44 @@
 from pathlib import Path
 from PIL import Image as pili
+from scipy.fftpack import dct
 import numpy as np
 
 
 class MacroBlock:
+    q_mat = np.array([
+        [16, 11, 10, 16, 24, 40, 51, 61],
+        [12, 12, 14, 19, 26, 58, 60, 55],
+        [14, 13, 16, 24, 40, 57, 69, 56],
+        [14, 17, 22, 29, 51, 87, 80, 62],
+        [18, 22, 37, 56, 68, 109, 103, 77],
+        [24, 35, 55, 64, 81, 104, 113, 92],
+        [49, 64, 78, 87, 103, 121, 120, 101],
+        [72, 92, 95, 98, 112, 100, 103, 99]])
+
     def __init__(self, block):
         self._block = block
 
+    @staticmethod
+    def _spectrum(mb):
+        return dct(mb._block - 128)
+
+    @staticmethod
+    def _quantize(spectrum, q):
+        alpha = 5000 / q if q < 50 else 200 - 2 * q
+        return spectrum / ((MacroBlock.q_mat * alpha + 50) / 100)
+
+    @staticmethod
+    def _zigzag(m):
+        # Ugly zigzag line
+        z = np.concatenate([np.diagonal(m[::-1, :], i)[::(2 * (i % 2) - 1)] for i in range(1 - m.shape[0], m.shape[0])])
+        # Get a filter, make it so we only lose the last zeros from zigzag.
+        f = z != 0
+        f[:f[::-1].tolist().index(True)] = True
+        return z[f]
+
+    @property
+    def block(self):
+        return self._block
 
 
 class MyImage:
@@ -40,7 +72,7 @@ class MyImage:
 
         height_pad = 8 - img.height % 8 if img.height % 8 != 0 else 0
         width_pad = 8 - img.width % 8 if img.width % 8 != 0 else 0
-        arr = np.pad(arr, [(0, height_pad), (0, width_pad), (0,0)], mode='symmetric')
+        arr = np.pad(arr, [(0, height_pad), (0, width_pad), (0, 0)], mode='symmetric')
 
         split_height = arr.shape[0] / 8
         split_width = arr.shape[1] / 8
@@ -49,7 +81,6 @@ class MyImage:
     @staticmethod
     def from_macro_blocks(macro_blocks):
         return MyImage(array=np.concatenate(np.concatenate(macro_blocks, axis=1), axis=1))
-
 
     @property
     def array(self):
