@@ -87,11 +87,17 @@ class MyImage:
 
         split_height = arr.shape[0] / 8
         split_width = arr.shape[1] / 8
-        return np.array([np.split(x, split_width, axis=1) for x in np.split(arr, split_height)])
+        return np.array([[MacroBlock(y, 50) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
 
     @staticmethod
     def from_macro_blocks(macro_blocks):
         return MyImage(array=np.concatenate(np.concatenate(macro_blocks, axis=1), axis=1))
+
+    @staticmethod
+    def grayscale_compress(img):
+        img = MyImage.grayscale(img)
+        return MyImage.get_macro_blocks(img)
+
 
     @property
     def array(self):
