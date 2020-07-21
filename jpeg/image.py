@@ -15,8 +15,10 @@ class MacroBlock:
         [49, 64, 78, 87, 103, 121, 120, 101],
         [72, 92, 95, 98, 112, 100, 103, 99]])
 
-    def __init__(self, block):
+    def __init__(self, block, q):
         self._block = block
+        self._coefs = MacroBlock._zigzag(MacroBlock._quantize(MacroBlock._spectrum(self), q))
+        self._ratio = 64 / len(self._coefs)
 
     @staticmethod
     def _spectrum(mb):
@@ -40,10 +42,18 @@ class MacroBlock:
     def block(self):
         return self._block
 
+    @property
+    def coefs(self):
+        return self._coefs
+
+    @property
+    def ratio(self):
+        return self._ratio
+
 
 class MyImage:
     def __init__(self, height=1, width=1, array=None, space='RGB', grayscale=False):
-        self._repr = array.copy() if array is not None else np.full((height, width, 3), 255, dtype='uint8')
+        self._repr = np.array(array.copy(), dtype='uint8') if array is not None else np.full((height, width, 3), 255, dtype='uint8')
         self._space = space
         self._grayscale = grayscale
 
@@ -72,7 +82,8 @@ class MyImage:
 
         height_pad = 8 - img.height % 8 if img.height % 8 != 0 else 0
         width_pad = 8 - img.width % 8 if img.width % 8 != 0 else 0
-        arr = np.pad(arr, [(0, height_pad), (0, width_pad), (0, 0)], mode='symmetric')
+        # arr = np.pad(arr, [(0, height_pad), (0, width_pad), (0, 0)], mode='symmetric')
+        arr = np.pad(arr, [(0, height_pad), (0, width_pad)], mode='symmetric')
 
         split_height = arr.shape[0] / 8
         split_width = arr.shape[1] / 8
