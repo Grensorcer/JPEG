@@ -57,16 +57,9 @@ class MyImage:
         self._space = space
         self._grayscale = grayscale
 
-    def to_image(self) -> pili.Image:
-        return pili.fromarray(self._repr)
-
-    def __copy__(self):
-        return MyImage(array=self._repr)
-
     @staticmethod
-    def grayscale(img):
-        res = img.array[..., :3] @ [0.2989, 0.5870, 0.1140]
-        return MyImage(array=res, grayscale=True)
+    def to_image(img) -> pili.Image:
+        return pili.fromarray(img.array)
 
     @staticmethod
     def from_image(path):
@@ -75,6 +68,14 @@ class MyImage:
             raise Exception("Image does not exist")
         image = pili.open(p).convert("RGB")
         return MyImage(array=np.asarray(image))
+
+    def __copy__(self):
+        return MyImage(array=self._repr)
+
+    @staticmethod
+    def grayscale(img):
+        res = img.array[..., :3] @ [0.2989, 0.5870, 0.1140]
+        return MyImage(array=res, grayscale=True)
 
     @staticmethod
     def get_macro_blocks(img):
@@ -90,14 +91,13 @@ class MyImage:
         return np.array([[MacroBlock(y, 50) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
 
     @staticmethod
-    def from_macro_blocks(macro_blocks):
-        return MyImage(array=np.concatenate(np.concatenate(macro_blocks, axis=1), axis=1))
-
-    @staticmethod
     def grayscale_compress(img):
         img = MyImage.grayscale(img)
         return MyImage.get_macro_blocks(img)
 
+    @staticmethod
+    def from_macro_blocks(macro_blocks):
+        return MyImage(array=np.concatenate(np.concatenate(macro_blocks, axis=1), axis=1))
 
     @property
     def array(self):
