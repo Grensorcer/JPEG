@@ -22,21 +22,39 @@ class MacroBlock:
 
     @staticmethod
     def _spectrum(mb):
-        return dct(mb._block - 128)
+        return dct(np.array(mb._block, dtype='int') - 128)
 
     @staticmethod
     def _quantize(spectrum, q):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
-        return spectrum / ((MacroBlock.q_mat * alpha + 50) / 100)
+        return np.array(np.round(spectrum / ((MacroBlock.q_mat * alpha + 50) / 100)), dtype='int')
 
     @staticmethod
     def _zigzag(m):
         # Ugly zigzag line
-        z = np.concatenate([np.diagonal(m[::-1, :], i)[::(2 * (i % 2) - 1)] for i in range(1 - m.shape[0], m.shape[0])])
+        z = np.concatenate([np.diagonal(m[::-1, :], i)[::(1 - 2 * (i % 2))] for i in range(1 - m.shape[0], m.shape[0])])
         # Get a filter, make it so we only lose the last zeros from zigzag.
-        f = z != 0
-        f[:f[::-1].tolist().index(True)] = True
-        return z[f]
+        if z[-1] == 0:
+            f = z != 0
+            f[:len(f) - f[::-1].tolist().index(True) - 1] = True
+            return z[f]
+        else:
+            return z
+
+    @staticmethod
+    def _unzigzag(z, s):
+        z = np.pad(z, (0, 64 - len(z)), constant_values=0)
+        res = np.zeros((s, s), dtype='int')
+        i = 0
+        for j in range(1 - s, 1):
+            diag_size = s - abs(j)
+            np.fill_diagonal(res[::-1, :][abs(j):, :], z[i:i + diag_size][::(1 - 2 * (j % 2))])
+            i += diag_size
+        for j in range(1, s):
+            diag_size = s - abs(j)
+            np.fill_diagonal(res[::-1, :][:, j:], z[i:i + diag_size][::(1 - 2 * (j % 2))])
+            i += diag_size
+        return res
 
     @property
     def block(self):
@@ -53,7 +71,8 @@ class MacroBlock:
 
 class MyImage:
     def __init__(self, height=1, width=1, array=None, space='RGB', grayscale=False):
-        self._repr = np.array(array.copy(), dtype='uint8') if array is not None else np.full((height, width, 3), 255, dtype='uint8')
+        self._repr = np.array(array.copy(), dtype='uint8') if array is not None else np.full((height, width, 3), 255,
+                                                                                             dtype='uint8')
         self._space = space
         self._grayscale = grayscale
 
@@ -78,7 +97,7 @@ class MyImage:
         return MyImage(array=res, grayscale=True)
 
     @staticmethod
-    def get_macro_blocks(img):
+    def get_macro_blocks(img, q):
         arr = img.array
 
         height_pad = 8 - img.height % 8 if img.height % 8 != 0 else 0
@@ -88,12 +107,13 @@ class MyImage:
 
         split_height = arr.shape[0] / 8
         split_width = arr.shape[1] / 8
-        return np.array([[MacroBlock(y, 50) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
+        return np.array(
+            [[MacroBlock(y, 50) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
 
     @staticmethod
-    def grayscale_compress(img):
+    def grayscale_compress(img, q):
         img = MyImage.grayscale(img)
-        return MyImage.get_macro_blocks(img)
+        return MyImage.get_macro_blocks(img, q)
 
     @staticmethod
     def from_macro_blocks(macro_blocks):
