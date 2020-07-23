@@ -1,6 +1,5 @@
 from pathlib import Path
 from PIL import Image as pili
-from scipy.fftpack import dct, idct
 import numpy as np
 
 
