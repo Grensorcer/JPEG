@@ -31,11 +31,11 @@ class MacroBlock:
     def __init__(self, block, q):
         self._array = block
         self._coefs = MacroBlock._zigzag(MacroBlock._quantize(MacroBlock._spectrum(self), q))
-        self._ratio = 64 / len(self._coefs)
+        self._ratio = 64 / len(self._coefs) if len(self._coefs) != 0 else np.inf
 
     @staticmethod
-    def uncompress(mb):
-        return MacroBlock._unspectrum(MacroBlock._unquantize(MacroBlock._unzigzag(mb.coefs, 8)))
+    def uncompress(mb, q):
+        return MacroBlock._unspectrum(MacroBlock._unquantize(MacroBlock._unzigzag(mb.coefs, 8), q))
 
     @staticmethod
     def _spectrum(mb):
@@ -51,8 +51,9 @@ class MacroBlock:
         return np.array(np.round(spectrum / ((MacroBlock.q_mat * alpha + 50) / 100)), dtype='int')
 
     @staticmethod
-    def _unquantize(m):
-        return m * MacroBlock.q_mat
+    def _unquantize(m, q):
+        alpha = 5000 / q if q < 50 else 200 - 2 * q
+        return m * ((MacroBlock.q_mat * alpha + 50) / 100)
 
     @staticmethod
     def _zigzag(m):
@@ -61,7 +62,8 @@ class MacroBlock:
         # Get a filter, make it so we only lose the last zeros from zigzag.
         if z[-1] == 0:
             f = z != 0
-            f[:len(f) - f[::-1].tolist().index(True) - 1] = True
+            if True in f:
+                f[:len(f) - f[::-1].tolist().index(True) - 1] = True
             return z[f]
         else:
             return z
@@ -141,9 +143,9 @@ class MyImage:
         return MyImage.get_macro_arrays(img, q)
 
     @staticmethod
-    def grayscale_uncompress(macro_arrays):
+    def grayscale_uncompress(macro_arrays, q):
         return MyImage(array=np.concatenate(
-            np.concatenate(np.array([[MacroBlock.uncompress(mb2) for mb2 in mb1] for mb1 in macro_arrays]), axis=1),
+            np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays]), axis=1),
             axis=1))
 
     @staticmethod
