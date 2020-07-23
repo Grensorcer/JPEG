@@ -1,7 +1,11 @@
 from pathlib import Path
 from PIL import Image as pili
-from scipy.fftpack import dct
+from scipy.fftpack import dct, idct
 import numpy as np
+
+
+def dct8_line(n):
+    return np.fromfunction(lambda i: np.cos((i * 2 * n + n) * np.pi / 16), (8,))
 
 
 class MacroBlock:
@@ -15,19 +19,40 @@ class MacroBlock:
         [49, 64, 78, 87, 103, 121, 120, 101],
         [72, 92, 95, 98, 112, 100, 103, 99]])
 
+    d8 = 0.5 * np.array([np.full((8,), 1 / np.sqrt(2)),
+                         dct8_line(1),
+                         dct8_line(2),
+                         dct8_line(3),
+                         dct8_line(4),
+                         dct8_line(5),
+                         dct8_line(6),
+                         dct8_line(7)])
+
     def __init__(self, block, q):
-        self._block = block
+        self._array = block
         self._coefs = MacroBlock._zigzag(MacroBlock._quantize(MacroBlock._spectrum(self), q))
         self._ratio = 64 / len(self._coefs)
 
     @staticmethod
+    def uncompress(mb):
+        return MacroBlock._unspectrum(MacroBlock._unquantize(MacroBlock._unzigzag(mb.coefs, 8)))
+
+    @staticmethod
     def _spectrum(mb):
-        return dct(np.array(mb._block, dtype='int') - 128)
+        return MacroBlock.d8 @ (np.array(mb._array, dtype='int') - 128) @ MacroBlock.d8.T
+
+    @staticmethod
+    def _unspectrum(spectrum):
+        return np.array(np.round(MacroBlock.d8.T @ spectrum @ MacroBlock.d8) + 128, dtype='uint8')
 
     @staticmethod
     def _quantize(spectrum, q):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
         return np.array(np.round(spectrum / ((MacroBlock.q_mat * alpha + 50) / 100)), dtype='int')
+
+    @staticmethod
+    def _unquantize(m):
+        return m * MacroBlock.q_mat
 
     @staticmethod
     def _zigzag(m):
@@ -57,8 +82,8 @@ class MacroBlock:
         return res
 
     @property
-    def block(self):
-        return self._block
+    def array(self):
+        return self._array
 
     @property
     def coefs(self):
@@ -97,7 +122,7 @@ class MyImage:
         return MyImage(array=res, grayscale=True)
 
     @staticmethod
-    def get_macro_blocks(img, q):
+    def get_macro_arrays(img, q):
         arr = img.array
 
         height_pad = 8 - img.height % 8 if img.height % 8 != 0 else 0
@@ -108,16 +133,22 @@ class MyImage:
         split_height = arr.shape[0] / 8
         split_width = arr.shape[1] / 8
         return np.array(
-            [[MacroBlock(y, 50) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
+            [[MacroBlock(y, q) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
 
     @staticmethod
     def grayscale_compress(img, q):
         img = MyImage.grayscale(img)
-        return MyImage.get_macro_blocks(img, q)
+        return MyImage.get_macro_arrays(img, q)
 
     @staticmethod
-    def from_macro_blocks(macro_blocks):
-        return MyImage(array=np.concatenate(np.concatenate(macro_blocks, axis=1), axis=1))
+    def grayscale_uncompress(macro_arrays):
+        return MyImage(array=np.concatenate(
+            np.concatenate(np.array([[MacroBlock.uncompress(mb2) for mb2 in mb1] for mb1 in macro_arrays]), axis=1),
+            axis=1))
+
+    @staticmethod
+    def from_macro_arrays(macro_arrays):
+        return MyImage(array=np.concatenate(np.concatenate(macro_arrays, axis=1), axis=1))
 
     @property
     def array(self):
@@ -137,4 +168,4 @@ class MyImage:
 
     @property
     def space(self):
-        return self._repr.space
+        return self._space
