@@ -102,6 +102,15 @@ class MyImage:
         self._space = space
         self._grayscale = grayscale
 
+    def channel0(self):
+        return MyImage(array=self._repr[:, :, 0])
+
+    def channel1(self):
+        return MyImage(array=self._repr[:, :, 1])
+
+    def channel2(self):
+        return MyImage(array=self._repr[:, :, 2])
+
     @staticmethod
     def to_image(img) -> pili.Image:
         return pili.fromarray(img.array)
@@ -146,6 +155,20 @@ class MyImage:
         return MyImage(array=np.concatenate(
             np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays]), axis=1),
             axis=1))
+
+    @staticmethod
+    def rgb_compress(img, q):
+        r = img.channel0()
+        g = img.channel1()
+        b = img.channel2()
+        return np.array([MyImage.get_macro_arrays(r, q), MyImage.get_macro_arrays(g, q), MyImage.get_macro_arrays(b, q)])
+
+    @staticmethod
+    def rgb_uncompress(macro_arrays, q):
+        r = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[0]]), axis=1),axis=1)
+        g = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[1]]), axis=1),axis=1)
+        b = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[2]]), axis=1),axis=1)
+        return MyImage(array=np.stack((r, g, b), axis=-1))
 
     @staticmethod
     def from_macro_arrays(macro_arrays):
