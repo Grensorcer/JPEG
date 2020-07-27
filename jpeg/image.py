@@ -1,6 +1,7 @@
 from pathlib import Path
 from PIL import Image as pili
 import numpy as np
+from skimage import color
 
 
 def dct8_line(n):
@@ -130,6 +131,36 @@ class MyImage:
     def grayscale(img):
         res = img.array[..., :3] @ [0.2989, 0.5870, 0.1140]
         return MyImage(array=res, grayscale=True)
+
+    @staticmethod
+    def RGB_to_YUV(img):
+        yuv = color.rgb2yuv(img.array)
+        yuv[:,:,0] *= 255
+        yuv[:,:,1] +=0.436
+        yuv[:,:,1] *= 255 / 0.872
+        yuv[:,:,2] += 0.615
+        yuv[:,:,2] *= 255 / 1.23
+
+        # print("ÇA C YUVVVVVVVVVVVVVVVVVVVVVV",yuv)
+
+        return MyImage(array=np.round(yuv))
+        
+    @staticmethod
+    def YUV_to_RGB(img):
+        arr = np.array(img.array, dtype='float64')
+        arr[:,:,0]/= 255
+        arr[:,:,1]/= 255 / 0.872
+        arr[:,:,1]-=0.436
+        arr[:,:,2]/= 255 / 1.23
+        arr[:,:,2]-=0.615
+
+        print(arr)
+
+        return MyImage(array=np.clip(np.round(color.yuv2rgb(arr) * 255), 0, 255))
+        
+        
+        
+
 
     @staticmethod
     def get_macro_arrays(img, q):
