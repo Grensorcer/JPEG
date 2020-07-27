@@ -42,17 +42,17 @@ class MacroBlock:
 
     @staticmethod
     def _unspectrum(spectrum):
-        return np.array(np.round(MacroBlock.d8.T @ spectrum @ MacroBlock.d8) + 128, dtype='uint8')
+        return np.array(np.clip(np.round(MacroBlock.d8.T @ spectrum @ MacroBlock.d8) + 128, 0, 255), dtype='uint8')
 
     @staticmethod
     def _quantize(spectrum, q):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
-        return np.array(np.round(spectrum / ((MacroBlock.q_mat * alpha + 50) / 100)), dtype='int')
+        return np.round(spectrum / np.floor((MacroBlock.q_mat * alpha + 50) / 100))
 
     @staticmethod
     def _unquantize(m, q):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
-        return m * ((MacroBlock.q_mat * alpha + 50) / 100)
+        return m * np.floor((MacroBlock.q_mat * alpha + 50) / 100)
 
     @staticmethod
     def _zigzag(m):
@@ -165,9 +165,9 @@ class MyImage:
 
     @staticmethod
     def rgb_uncompress(macro_arrays, q):
-        r = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[0]]), axis=1),axis=1)
-        g = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[1]]), axis=1),axis=1)
-        b = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[2]]), axis=1),axis=1)
+        r = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[0]]), axis=1), axis=1)
+        g = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[1]]), axis=1), axis=1)
+        b = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q) for mb2 in mb1] for mb1 in macro_arrays[2]]), axis=1), axis=1)
         return MyImage(array=np.stack((r, g, b), axis=-1))
 
     @staticmethod
