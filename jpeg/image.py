@@ -224,9 +224,9 @@ class MyImage:
         return MyImage(array=np.concatenate(np.concatenate(macro_arrays, axis=1), axis=1))
 
     @staticmethod
-    def square_upsampling(img, size):
-        f = lambda i, j: img.array[i / size, j / size]
-        arr = np.fromfunction(f, shape=(img.shape[0]*size, img.shape[1]*size))
+    def upsampling(img, sizex, sizey):
+        f = lambda i, j: (img.array)[i // sizey, j // sizex]
+        arr = np.fromfunction(f, (img.shape[0]*sizey, img.shape[1]*sizex), dtype=int)
         return MyImage(array=arr)
 
 
