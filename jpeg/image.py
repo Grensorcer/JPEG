@@ -19,6 +19,16 @@ class MacroBlock:
         [49, 64, 78, 87, 103, 121, 120, 101],
         [72, 92, 95, 98, 112, 100, 103, 99]])
 
+    quv_mat = np.array([
+        [17, 18, 24, 47, 99, 99, 99, 99],
+        [18, 21, 26, 66, 99, 99, 99, 99],
+        [24, 26, 56, 99, 99, 99, 99, 99],
+        [47, 66, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99],
+        [99, 99, 99, 99, 99, 99, 99, 99]])
+
     d8 = 0.5 * np.array([np.full((8,), 1 / np.sqrt(2)),
                          dct8_line(1),
                          dct8_line(2),
@@ -28,14 +38,14 @@ class MacroBlock:
                          dct8_line(6),
                          dct8_line(7)])
 
-    def __init__(self, block, q):
+    def __init__(self, block, q, space='RGB'):
         self._array = block
-        self._coefs = MacroBlock._zigzag(MacroBlock._quantize(MacroBlock._spectrum(self), q))
+        self._coefs = MacroBlock._zigzag(MacroBlock._quantize(MacroBlock._spectrum(self), q, space))
         self._ratio = 64 / len(self._coefs) if len(self._coefs) != 0 else np.inf
 
     @staticmethod
-    def uncompress(mb, q):
-        return MacroBlock._unspectrum(MacroBlock._unquantize(MacroBlock._unzigzag(mb.coefs, 8), q))
+    def uncompress(mb, q, space='RGB'):
+        return MacroBlock._unspectrum(MacroBlock._unquantize(MacroBlock._unzigzag(mb.coefs, 8), q, space))
 
     @staticmethod
     def _spectrum(mb):
@@ -46,14 +56,16 @@ class MacroBlock:
         return np.array(np.clip(np.round(MacroBlock.d8.T @ spectrum @ MacroBlock.d8) + 128, 0, 255), dtype='uint8')
 
     @staticmethod
-    def _quantize(spectrum, q):
+    def _quantize(spectrum, q, space):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
-        return np.round(spectrum / np.floor((MacroBlock.q_mat * alpha + 50) / 100))
+        qmat = MacroBlock.quv_mat if space == 'YUV' else MacroBlock.quv_mat
+        return np.round(spectrum / np.floor((qmat * alpha + 50) / 100))
 
     @staticmethod
-    def _unquantize(m, q):
+    def _unquantize(m, q, space):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
-        return m * np.floor((MacroBlock.q_mat * alpha + 50) / 100)
+        qmat = MacroBlock.quv_mat if space == 'YUV' else MacroBlock.quv_mat
+        return m * np.floor((qmat * alpha + 50) / 100)
 
     @staticmethod
     def _zigzag(m):
@@ -136,34 +148,24 @@ class MyImage:
     def RGB_to_YUV(img):
         yuv = color.rgb2yuv(img.array)
         yuv[:,:,0] *= 255
-        yuv[:,:,1] +=0.436
+        yuv[:,:,1] += 0.436
         yuv[:,:,1] *= 255 / 0.872
         yuv[:,:,2] += 0.615
         yuv[:,:,2] *= 255 / 1.23
-
-        # print("ÇA C YUVVVVVVVVVVVVVVVVVVVVVV",yuv)
-
-        return MyImage(array=np.round(yuv))
+        return MyImage(array=np.clip(np.round(yuv), 0, 255))
         
     @staticmethod
     def YUV_to_RGB(img):
         arr = np.array(img.array, dtype='float64')
-        arr[:,:,0]/= 255
-        arr[:,:,1]/= 255 / 0.872
-        arr[:,:,1]-=0.436
-        arr[:,:,2]/= 255 / 1.23
-        arr[:,:,2]-=0.615
-
-        print(arr)
-
+        arr[:,:,0] /= 255
+        arr[:,:,1] /= 255 / 0.872
+        arr[:,:,1] -= 0.436
+        arr[:,:,2] /= 255 / 1.23
+        arr[:,:,2] -= 0.615
         return MyImage(array=np.clip(np.round(color.yuv2rgb(arr) * 255), 0, 255))
-        
-        
-        
-
 
     @staticmethod
-    def get_macro_arrays(img, q):
+    def get_macro_arrays(img, q, space='RGB'):
         arr = img.array
 
         height_pad = 8 - img.height % 8 if img.height % 8 != 0 else 0
@@ -174,7 +176,7 @@ class MyImage:
         split_height = arr.shape[0] / 8
         split_width = arr.shape[1] / 8
         return np.array(
-            [[MacroBlock(y, q) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
+            [[MacroBlock(y, q, space) for y in np.split(x, split_width, axis=1)] for x in np.split(arr, split_height)])
 
     @staticmethod
     def grayscale_compress(img, q):
@@ -202,8 +204,31 @@ class MyImage:
         return MyImage(array=np.stack((r, g, b), axis=-1))
 
     @staticmethod
+    def yuv_compress(img, q, downsampling=0):
+        yuv = MyImage.RGB_to_YUV(img)
+        y = yuv.channel0()
+        u = yuv.channel1()
+        v = yuv.channel2()
+        return np.array([MyImage.get_macro_arrays(y, q, 'YUV'), MyImage.get_macro_arrays(u, q, 'YUV'), MyImage.get_macro_arrays(v, q, 'YUV')])
+
+    @staticmethod
+    def yuv_uncompress(macro_arrays, q, downsampling=0):
+        y = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q, 'YUV') for mb2 in mb1] for mb1 in macro_arrays[0]]), axis=1), axis=1)
+        u = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q, 'YUV') for mb2 in mb1] for mb1 in macro_arrays[1]]), axis=1), axis=1)
+        v = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q, 'YUV') for mb2 in mb1] for mb1 in macro_arrays[2]]), axis=1), axis=1)
+        stack = np.stack((y, u, v), axis=-1)
+        return MyImage.YUV_to_RGB(MyImage(array=stack))
+
+    @staticmethod
     def from_macro_arrays(macro_arrays):
         return MyImage(array=np.concatenate(np.concatenate(macro_arrays, axis=1), axis=1))
+
+    @staticmethod
+    def square_upsampling(img, size):
+        f = lambda i, j: img.array[i / size, j / size]
+        arr = np.fromfunction(f, shape=(img.shape[0]*size, img.shape[1]*size))
+        return MyImage(array=arr)
+
 
     @property
     def array(self):
