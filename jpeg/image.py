@@ -229,6 +229,10 @@ class MyImage:
         arr = np.fromfunction(f, (img.shape[0]*sizey, img.shape[1]*sizex), dtype=int)
         return MyImage(array=arr)
 
+    @staticmethod
+    def downsampling(img, sizex, sizey):
+        arr = img.array[::sizey, ::sizex]
+        return MyImage(array=arr)
 
     @property
     def array(self):
