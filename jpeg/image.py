@@ -204,18 +204,37 @@ class MyImage:
         return MyImage(array=np.stack((r, g, b), axis=-1))
 
     @staticmethod
-    def yuv_compress(img, q, downsampling=0):
+    def yuv_compress(img, q, downsampling='4:4:4'):
         yuv = MyImage.RGB_to_YUV(img)
         y = yuv.channel0()
         u = yuv.channel1()
         v = yuv.channel2()
-        return np.array([MyImage.get_macro_arrays(y, q, 'YUV'), MyImage.get_macro_arrays(u, q, 'YUV'), MyImage.get_macro_arrays(v, q, 'YUV')])
+        if downsampling == '4:2:2':
+            u = u.downsampling(u, 2, 1)
+            v = v.downsampling(v, 2, 1)
+        elif downsampling == '4:2:0':
+            u = u.downsampling(u, 2, 2)
+            v = v.downsampling(v, 2, 2)
+        return [MyImage.get_macro_arrays(y, q, 'YUV'),
+                MyImage.get_macro_arrays(u, q, 'YUV'),
+                MyImage.get_macro_arrays(v, q, 'YUV')]
 
     @staticmethod
-    def yuv_uncompress(macro_arrays, q, downsampling=0):
+    def yuv_uncompress(macro_arrays, q, downsampling='4:4:4'):
         y = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q, 'YUV') for mb2 in mb1] for mb1 in macro_arrays[0]]), axis=1), axis=1)
         u = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q, 'YUV') for mb2 in mb1] for mb1 in macro_arrays[1]]), axis=1), axis=1)
         v = np.concatenate(np.concatenate(np.array([[MacroBlock.uncompress(mb2, q, 'YUV') for mb2 in mb1] for mb1 in macro_arrays[2]]), axis=1), axis=1)
+        
+        if downsampling == '4:2:2':
+            u = MyImage.upsampling(u, 2, 1)
+            v = MyImage.upsampling(v, 2, 1)
+        elif downsampling == '4:2:0':
+            u = MyImage.upsampling(u, 2, 2)
+            v = MyImage.upsampling(v, 2, 2)
+        print(y.shape, u.shape, v.shape)
+        shapes = {arr.shape for arr in (y, u, v)}
+        print(shapes)
+
         stack = np.stack((y, u, v), axis=-1)
         return MyImage.YUV_to_RGB(MyImage(array=stack))
 
@@ -224,9 +243,9 @@ class MyImage:
         return MyImage(array=np.concatenate(np.concatenate(macro_arrays, axis=1), axis=1))
 
     @staticmethod
-    def upsampling(img, sizex, sizey):
-        f = lambda i, j: (img.array)[i // sizey, j // sizex]
-        arr = np.fromfunction(f, (img.shape[0]*sizey, img.shape[1]*sizex), dtype=int)
+    def upsampling(in_arr, sizex, sizey):
+        f = lambda i, j: (in_arr)[i // sizey, j // sizex]
+        arr = np.fromfunction(f, (in_arr.shape[0]*sizey, in_arr.shape[1]*sizex), dtype=int)
         return MyImage(array=arr)
 
     @staticmethod
