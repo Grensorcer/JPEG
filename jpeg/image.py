@@ -231,7 +231,7 @@ class MyImage:
         elif downsampling == '4:2:0':
             u = MyImage.upsampling(u, 2, 2)
             v = MyImage.upsampling(v, 2, 2)
-        print(y.shape, u.shape, v.shape)
+        print(y.dtype, u.dtype, v.dtype)
         shapes = {arr.shape for arr in (y, u, v)}
         print(shapes)
 
@@ -246,7 +246,7 @@ class MyImage:
     def upsampling(in_arr, sizex, sizey):
         f = lambda i, j: (in_arr)[i // sizey, j // sizex]
         arr = np.fromfunction(f, (in_arr.shape[0]*sizey, in_arr.shape[1]*sizex), dtype=int)
-        return MyImage(array=arr)
+        return arr
 
     @staticmethod
     def downsampling(img, sizex, sizey):
