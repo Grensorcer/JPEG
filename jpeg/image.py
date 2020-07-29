@@ -79,14 +79,14 @@ class MacroBlock:
     @staticmethod
     def _quantize(spectrum, q, space):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
-        qmat = MacroBlock.quv_mat if space == "YUV" else MacroBlock.quv_mat
-        return np.round(spectrum / np.floor((qmat * alpha + 50) / 100))
+        qmat = MacroBlock.quv_mat if space == "YUV" else MacroBlock.q_mat
+        return np.round(spectrum / np.round((qmat * alpha + 50) / 100))
 
     @staticmethod
     def _unquantize(m, q, space):
         alpha = 5000 / q if q < 50 else 200 - 2 * q
-        qmat = MacroBlock.quv_mat if space == "YUV" else MacroBlock.quv_mat
-        return m * np.floor((qmat * alpha + 50) / 100)
+        qmat = MacroBlock.quv_mat if space == "YUV" else MacroBlock.q_mat
+        return m * np.round((qmat * alpha + 50) / 100)
 
     @staticmethod
     def _zigzag(m):
@@ -311,8 +311,8 @@ class MyImage:
         elif downsampling == "4:2:0":
             u = u.upsampling(2, 2)
             v = v.upsampling(2, 2)
-        u = u.trim(u.shape[1] - y.shape[1], u.shape[0] - y.shape[0])
-        v = v.trim(v.shape[1] - y.shape[1], v.shape[0] - v.shape[0])
+        u = u.trim(u.width - y.width, u.height - y.height)
+        v = v.trim(v.width - y.width, v.height - y.height)
 
         stack = np.stack((y.array, u.array, v.array), axis=-1)
         return MyImage.YUV_to_RGB(MyImage(stack, space="YUV"))
@@ -328,7 +328,7 @@ class MyImage:
             return self
 
     def upsampling(self, sizex, sizey):
-        f = lambda i, j: (self._array)[i // sizey, j // sizex]
+        f = lambda i, j: self._array[i // sizey, j // sizex]
         arr = np.fromfunction(f, (self.height * sizey, self.width * sizex), dtype=int)
         return MyImage(arr, space=self.space)
 
