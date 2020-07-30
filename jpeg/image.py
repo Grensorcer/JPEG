@@ -57,7 +57,7 @@ class MacroBlock:
         self._coefs = MacroBlock._zigzag(
             MacroBlock._quantize(self._spectrum(), q, space)
         )
-        self._ratio = 64 / len(self._coefs) if len(self._coefs) != 0 else np.inf
+        self._ratio = len(self._coefs) / 64
 
     def uncompress(self, q, space="RGB"):
         return MacroBlock._unspectrum(
